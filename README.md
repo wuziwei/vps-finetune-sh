@@ -1,31 +1,31 @@
-🚀 VPS Finetune SH (甲骨文云 / Linux VPS 状态诊断与调优加固)
+# 🚀 VPS Finetune SH (甲骨文云 / Linux VPS 状态诊断与调优加固)
 
-Bash
+[![Bash](https://img.shields.io/badge/Language-Bash%205.0+-4EAA25?style=flat-square&logo=gnu-bash&logoColor=white)](https://www.gnu.org/software/bash/)
+[![Platform](https://img.shields.io/badge/Platform-Debian%20%7C%20Ubuntu-E95420?style=flat-square&logo=ubuntu&logoColor=white)](https://ubuntu.com/)
+[![Arch](https://img.shields.io/badge/Architecture-AMD64%20%7C%20ARM64-0078D4?style=flat-square)](https://www.arm.com/)
+[![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 
+专为 **Oracle Cloud（甲骨文云）** 及主流 Linux VPS（Debian / Ubuntu）量身定制的**全自动状态巡检、网络性能调优与安全加固工具**。
 
-Platform
+脚本采用 **「先诊断对比 ➔ 输出建议清单 ➔ 交互确认（输入 `yes`）➔ 幂等执行」** 的闭环安全机制，绝不盲目覆写配置，彻底避免网络中断与 SSH 失联风险。
 
+---
 
-Arch
+## ⚡ 一键执行指令
 
+在拥有 `root` 权限的 VPS 终端中，直接复制以下单行指令回车运行：
 
-License
-
-专为 Oracle Cloud（甲骨文云） 及各类主流 Linux VPS（Debian / Ubuntu）量身定制的全自动状态巡检、网络性能调优与安全加固工具。
-
-脚本采用「先诊断对比 ➔ 输出建议清单 ➔ 交互确认 (输入 yes) ➔ 幂等执行」的闭环安全机制，绝不盲目覆写配置，彻底避免网络中断与 SSH 失联风险。
-
-⚡ 一键执行指令
-
-在拥有 root 权限的 VPS 终端中，复制以下指令回车执行：
-
+```bash
 bash <(curl -fsSL "https://raw.githubusercontent.com/wuziwei/vps-finetune-sh/refs/heads/main/vps%20finetune.sh")
+```
 
+> **提示**：若当前为普通用户，请先运行 `sudo -i` 切换至 root。
 
-注意：若当前为普通用户，请先运行 sudo -i 切换至 root。
+---
 
-🧭 运行工作流
+## 🧭 运行工作流程
 
+```text
        ┌──────────────────────────────┐
        │   运行一键脚本 (curl | bash)   │
        └──────────────┬───────────────┘
@@ -39,7 +39,7 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/wuziwei/vps-finetune-sh/ref
        └──────────────┬───────────────┘
                       ▼
        ┌──────────────────────────────┐
-       │  生成待优化建议清单并等待输入 │
+       │  生成待优化建议清单并等待确认 │
        └──────────────┬───────────────┘
                       │
            ┌──────────┴──────────┐
@@ -50,14 +50,17 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/wuziwei/vps-finetune-sh/ref
   ┌─────────────────┐   ┌─────────────────┐
   │ 执行调优/安全加固│   │ 取消操作并退出  │
   └─────────────────┘   └─────────────────┘
+```
 
+---
 
-🖥️ 终端交互预览
+## 🖥️ 终端诊断与交互预览
 
-脚本运行后，会在屏幕上打印出清晰的诊断矩阵与调整清单：
+脚本运行后，会先采集系统各项参数并打印出结构化对比矩阵：
 
+```text
 ======================================================================
-       甲骨文云 / Linux VPS 系统健康诊断与推荐调优 (检查阶段)       
+       甲骨文云 / Linux VPS 系统健康诊断与推荐调优 (检查阶段)
 ======================================================================
 机器平台 : x86_64 (AMD / 通用实例) | 内存总计: 980 MB
 正在收集系统配置与内核运行参数，请稍候...
@@ -98,49 +101,55 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/wuziwei/vps-finetune-sh/ref
 确认提示：即将执行上述全部建议项。
 注意：关闭 SSH 密码登录前，脚本会自动检测 ~/.ssh/authorized_keys 是否存在公钥；若无公钥则安全跳过该项，防止失联。
 
-是否立即应用上述优化？请输入 [yes] 确认执行 (输入其它任意键退出): 
+是否立即应用上述优化？请输入 [yes] 确认执行 (输入其它任意键退出):
+```
 
+---
 
-🛠️ 核心功能与技术实现
+## 🛠️ 核心调优与安全矩阵
 
-1. 硬件自适应性能分流
+### 1. 硬件自适应参数分流
 
 根据系统架构和内存规格，自动套用适配参数：
 
-调优参数项	AMD 实例 (1GB 内存 / 精细防爆)	ARM 实例 (2C12G+ / 极致性能)
-UDP 缓冲上限 (rmem_max/wmem_max)	33554432 (32 MB)	67108864 (64 MB)
-UDP 默认缓冲 (rmem_default/wmem_default)	2097152 (2 MB)	4194304 (4 MB)
-最大连接跟踪数 (nf_conntrack_max)	524288 (52 万)	1048576 (104 万)
-套接字队列上限 (somaxconn / backlog)	32768	65535 / 30000
-甲骨文后台 Agent 处理	自动停用并卸载，省出 150MB+ 内存	默认保留运行
+| 调优参数项 | AMD 实例 (1GB 内存 / 精细防爆) | ARM 实例 (2C12G+ / 极致性能) |
+| :--- | :--- | :--- |
+| UDP 缓冲上限 (`rmem_max` / `wmem_max`) | 33554432 (32 MB) | 67108864 (64 MB) |
+| UDP 默认缓冲 (`rmem_default` / `wmem_default`) | 2097152 (2 MB) | 4194304 (4 MB) |
+| 最大连接跟踪数 (`nf_conntrack_max`) | 524288 (52 万) | 1048576 (104 万) |
+| 套接字队列上限 (`somaxconn` / `backlog`) | 32768 | 65535 / 30000 |
+| 甲骨文后台监控 Agent | 自动停用并禁用，释放约 150MB 内存 | 默认保留运行 |
 
-2. 网络协议栈与 DNS 优化
+### 2. 网络协议栈与 DNS 优化
 
-⚬ BBR + FQ：内核级启用 Google BBR 算法与 Fair Queue 调度规则。
-⚬ UDP 防爆表优化：针对 Hysteria 2 / TUIC / WireGuard 等高并发 UDP 协议，将流超时缩短至 120 秒、单包超时缩短至 30 秒，彻底解决 Conntrack 表被撑爆引发死机的问题。
-⚬ 双栈 DNS 实时选路：本地 ping/dig 测速 Cloudflare (1.1.1.1 / 2606:4700:4700::1111) 与 Google (8.8.8.8 / 2001:4860:4860::8888)，自动优选最低延迟 DNS 并执行 chattr +i 加锁，阻断甲骨文云 DHCP 覆写。
+- **BBR + FQ**：内核级激活 Google BBR 拥塞控制算法与 Fair Queue 队列调度。
+- **UDP 防爆表优化**：针对 Hysteria 2 / TUIC / WireGuard 等高并发 UDP 协议，将流超时缩短至 120 秒、单包超时缩短至 30 秒，彻底解决 Conntrack 表被撑爆引发死机的问题。
+- **双栈 DNS 实时选路**：本地实时测速 Cloudflare（`1.1.1.1` / `2606:4700:4700::1111`）与 Google（`8.8.8.8` / `2001:4860:4860::8888`），优选最低延迟 DNS 并执行 `chattr +i` 加锁，阻断甲骨文云 DHCP 覆写。
 
-3. IPv4 / IPv6 双栈 UDP 端口跳跃
+### 3. IPv4 / IPv6 双栈 UDP 端口跳跃
 
-⚬ 内核 NAT 层将 20000:50000 端口段映射至 2053，有效规避运营商端口 QoS。
-⚬ 使用 iptables-persistent 保证双栈规则在系统重启后自动恢复。
-⚬ 全规则集成幂等校验（使用 -C 检查），多次运行绝不产生多余的重复规则。
+- 内核 NAT 层将 `20000:50000` 端口段映射至 `2053`，有效规避运营商端口 QoS。
+- 使用 `iptables-persistent` 保证双栈规则在系统重启后自动恢复。
+- 全规则集成幂等校验（使用 `-C` 检查），多次运行绝不产生多余的重复规则。
 
-4. SSH 安全基线与 Fail2ban 防护
+### 4. SSH 安全基线与 Fail2ban 防护
 
-⚬ 防失联保护：仅在检测到 ~/.ssh/authorized_keys 存在合法公钥时才会关闭密码认证；未检测到公钥时自动跳过密码禁用。
-⚬ 并发重试限制：将 MaxAuthTries 限制为 3。
-⚬ Fail2ban 自动防御：监听 systemd journal 日志，10 分钟内输错 3 次密码即在防火墙底层拉黑该 IP 24 小时。
+- **防失联保护**：仅在检测到 `~/.ssh/authorized_keys` 存在合法公钥时才会关闭密码认证；未检测到公钥时自动跳过密码禁用。
+- **并发重试限制**：将 `MaxAuthTries` 限制为 3。
+- **Fail2ban 自动防御**：监听 systemd journal 日志，10 分钟内输错 3 次密码即在防火墙底层拉黑该 IP 24 小时。
 
-5. 内置 sing-box 版本管理工具
+### 5. 内置 sing-box 版本管理工具
 
-⚬ 自动安装 /usr/local/bin/update-singbox，全局命令行随时可用。
-⚬ 动态调用 GitHub Releases API，支持一键切换最新测试版、最新正式版或回退至任意历史版本。
+- 自动安装 `/usr/local/bin/update-singbox`，全局命令行随时可用。
+- 动态调用 GitHub Releases API，支持一键切换最新测试版、最新正式版或回退至任意历史版本。
 
-📋 日常运维指令速查
+---
+
+## 📋 日常运维指令速查
 
 优化完成后，可通过以下命令查看系统状态或维护服务：
 
+```bash
 # 1. 随时调出 sing-box 版本管理菜单（安装、升级、回退）
 update-singbox
 
@@ -153,19 +162,23 @@ fail2ban-client set sshd unbanip <IP地址>
 # 4. 查看端口跳跃数据包统计 (检查是否有真实流量命中)
 iptables -t nat -L PREROUTING -n -v | grep 20000:50000
 ip6tables -t nat -L PREROUTING -n -v | grep 20000:50000
+```
 
+---
 
-⚠️ 甲骨文云控制台安全列表设置 (重要)
+## ⚠️ 甲骨文云控制台安全列表设置 (重要)
 
-为保证端口跳跃与服务正常通网，请登录 Oracle Cloud 控制台，进入对应实例的 虚拟云网络 (VCN) ➔ 安全列表 (Security List) ➔ 入站规则 (Ingress Rules)，确保包含以下放行策略：
+为保证端口跳跃与服务正常通网，请登录 Oracle Cloud 控制台，进入对应实例的 **虚拟云网络 (VCN) ➔ 安全列表 (Security List) ➔ 入站规则 (Ingress Rules)**，确保包含以下放行策略：
 
-⚬ IPv4 UDP 规则：
-  ⚬ 源 CIDR：0.0.0.0/0
-  ⚬ 目标端口：20000-50000, 2053
-⚬ IPv6 UDP 规则（若开启了 IPv6）：
-  ⚬ 源 CIDR：::/0
-  ⚬ 目标端口：20000-50000, 2053
+- **IPv4 UDP 规则**
+  - 源 CIDR：`0.0.0.0/0`
+  - 目标端口：`20000-50000`, `2053`
+- **IPv6 UDP 规则**（若开启了 IPv6）
+  - 源 CIDR：`::/0`
+  - 目标端口：`20000-50000`, `2053`
 
-📄 License
+---
 
-本项目采用 MIT License 授权开源。
+## 📄 License
+
+本项目采用 [MIT License](LICENSE) 授权开源。
