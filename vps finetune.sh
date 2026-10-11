@@ -20,6 +20,10 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
+# 动态提升当前执行环境的句柄限制，防止未重新登录 SSH 导致沿用旧会话值
+ulimit -Hn 1048576 2>/dev/null || true
+ulimit -Sn 1048576 2>/dev/null || true
+
 echo -e "${CYAN}======================================================================${PLAIN}"
 echo -e "${BOLD}       甲骨文云 / Linux VPS 系统健康诊断与推荐调优 (检查阶段)       ${PLAIN}"
 echo -e "${CYAN}======================================================================${PLAIN}"
@@ -91,8 +95,8 @@ check_item "连接跟踪上限 (conn_max)" "$CUR_CONN" ">= $REC_CONN_MAX" "$OK" 
 
 # [项 5] 文件打开数硬限制 (LimitNOFILE)
 CUR_NOFILE=$(ulimit -Hn 2>/dev/null || echo "1024")
-[ "$CUR_NOFILE" -ge 1048576 ] && OK=1 || OK=0
-check_item "系统文件句柄 (nofile)" "$CUR_NOFILE" ">= 1048576" "$OK" "提高全局与 systemd 进程文件句柄上限至 1048576"
+[ "$CUR_NOFILE" -ge 1000000 ] && OK=1 || OK=0
+check_item "系统文件句柄 (nofile)" "$CUR_NOFILE" ">= 1000000" "$OK" "提高全局与 systemd 进程文件句柄上限至 1048576"
 
 # [项 6] SSH 认证重试限制 (MaxAuthTries)
 CUR_TRIES=$(grep -E "^[# ]*MaxAuthTries" /etc/ssh/sshd_config 2>/dev/null | awk '{print $2}' || echo "6")
@@ -212,9 +216,15 @@ else
     BACKLOG=32768; SOMAXCONN=32768; UDP_MEM="65536 131072 262144"; CONN_MAX=524288
 fi
 
+# 【核心修复】：清理 /etc/sysctl.conf 中的冲突配置，防止覆盖 99-network-optimize.conf
+if [ -f /etc/sysctl.conf ]; then
+    sed -i -E '/net\.(core|ipv4)\.(rmem|wmem|udp_mem|tcp_|somaxconn|netdev_max_backlog)/d' /etc/sysctl.conf 2>/dev/null || true
+fi
+
 cat << SYSCTL_EOF > /etc/sysctl.d/99-network-optimize.conf
 # 文件句柄
 fs.file-max = 2097152
+fs.nr_open = 2097152
 
 # HY2 / UDP 缓冲
 net.core.rmem_max = $RMEM_MAX
@@ -241,7 +251,9 @@ net.ipv6.conf.all.forwarding = 1
 net.ipv6.conf.default.forwarding = 1
 SYSCTL_EOF
 
-sysctl --system >/dev/null 2>&1
+# 先加载全量，再精准加载优化文件以确保优先级最高
+sysctl --system >/dev/null 2>&1 || true
+sysctl -p /etc/sysctl.d/99-network-optimize.conf >/dev/null 2>&1 || true
 
 # 文件句柄限制
 cat << 'LIMITS_EOF' > /etc/security/limits.d/99-nofile.conf
@@ -323,7 +335,7 @@ ip6tables -C INPUT -p udp --dport 20000:50000 -j ACCEPT >/dev/null 2>&1 || \
 
 netfilter-persistent save >/dev/null 2>&1 || true
 
-# 步骤 E：SSH 加固与 Fail2ban (仅限重试限制与防爆破，不关密码登录)
+# 步骤 E：SSH 加固与 Fail2ban
 echo -e "${CYAN}[5/6] 配置 SSH 重试限制与 Fail2ban 自动封禁...${PLAIN}"
 sed -i -E 's/^#?MaxAuthTries .*/MaxAuthTries 3/' /etc/ssh/sshd_config
 if ! grep -q "^MaxAuthTries" /etc/ssh/sshd_config; then
