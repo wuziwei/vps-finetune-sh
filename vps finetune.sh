@@ -99,12 +99,7 @@ CUR_TRIES=$(grep -E "^[# ]*MaxAuthTries" /etc/ssh/sshd_config 2>/dev/null | awk 
 [ "$CUR_TRIES" = "3" ] && OK=1 || OK=0
 check_item "SSH 最大认证尝试" "${CUR_TRIES:-6}" "3" "$OK" "将 SSH 最大认证重试次数限制为 3 次"
 
-# [项 7] SSH 密码认证状态
-CUR_PWD_AUTH=$(sshd -T 2>/dev/null | grep -i "^passwordauthentication" | awk '{print $2}' || echo "yes")
-[ "$CUR_PWD_AUTH" = "no" ] && OK=1 || OK=0
-check_item "SSH 密码认证" "$CUR_PWD_AUTH" "no (仅密钥)" "$OK" "关闭密码登录，强制使用密钥认证 (防暴力破解)"
-
-# [项 8] Fail2ban 防爆破保护
+# [项 7] Fail2ban 防爆破保护
 if systemctl is-active --quiet fail2ban 2>/dev/null; then
     F2B_STAT="运行中"; OK=1
 else
@@ -112,23 +107,23 @@ else
 fi
 check_item "Fail2ban 防爆破服务" "$F2B_STAT" "运行中" "$OK" "部署 Fail2ban (输错 3 次自动拉黑 24 小时)"
 
-# [项 9] IPv4 端口跳跃 (20000:50000 -> 2053)
-if iptables -t nat -C PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports 2053 2>/dev/null; then
+# [项 8] IPv4 端口跳跃 (20000:50000 -> 2053)
+if iptables -t nat -C PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports 2053 >/dev/null 2>&1; then
     V4_HOP="已生效"; OK=1
 else
     V4_HOP="未配置"; OK=0
 fi
 check_item "IPv4 端口跳跃" "$V4_HOP" "已生效" "$OK" "配置 IPv4 UDP 端口跳跃 (20000:50000 -> 2053) 并放行防火墙"
 
-# [项 10] IPv6 端口跳跃 (20000:50000 -> 2053)
-if ip6tables -t nat -C PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports 2053 2>/dev/null; then
+# [项 9] IPv6 端口跳跃 (20000:50000 -> 2053)
+if ip6tables -t nat -C PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports 2053 >/dev/null 2>&1; then
     V6_HOP="已生效"; OK=1
 else
     V6_HOP="未配置"; OK=0
 fi
 check_item "IPv6 端口跳跃" "$V6_HOP" "已生效" "$OK" "配置 IPv6 UDP 端口跳跃与转发，补齐双栈跳跃通路"
 
-# [项 11] update-singbox 工具部署
+# [项 10] update-singbox 工具部署
 if [ -x "/usr/local/bin/update-singbox" ]; then
     SB_TOOL="已安装"; OK=1
 else
@@ -136,7 +131,7 @@ else
 fi
 check_item "sing-box 版本管理工具" "$SB_TOOL" "已安装" "$OK" "部署 /usr/local/bin/update-singbox 一键升级/回滚脚本"
 
-# [项 12] DNS 锁定防 DHCP 篡改
+# [项 11] DNS 锁定防 DHCP 篡改
 if lsattr /etc/resolv.conf 2>/dev/null | grep -q -- "-i-"; then
     DNS_LOCK="已锁定(+i)"; OK=1
 else
@@ -144,7 +139,7 @@ else
 fi
 check_item "DNS 优选与防篡改锁定" "$DNS_LOCK" "已锁定(+i)" "$OK" "测速优选 Cloudflare/Google DNS 并锁定防 DHCP 覆盖"
 
-# [项 13] 甲骨文云 Agent (仅 AMD 1G 提示)
+# [项 12] 甲骨文云 Agent (仅 AMD 1G 提示)
 if [ "$ARCH" != "aarch64" ]; then
     if systemctl is-active --quiet oracle-cloud-agent 2>/dev/null; then
         AGENT_STAT="运行中(占内存)"; OK=0
@@ -173,12 +168,11 @@ for desc in "${FIX_ITEMS[@]}"; do
 done
 
 echo ""
-echo -e "${BOLD}确认提示：即将执行上述全部建议项。${PLAIN}"
-echo -e "${RED}注意：关闭 SSH 密码登录前，脚本会自动检测 ~/.ssh/authorized_keys 是否存在公钥；若无公钥则安全跳过该项，防止失联。${PLAIN}"
+echo -e "${BOLD}确认提示：即将执行上述优化建议项。${PLAIN}"
 echo ""
 
 # ------------------------------------------------------------------------------
-# 5. 交互输入校验 (使用 /dev/tty 保证管道执行 curl | bash 正常输入)
+# 5. 交互输入校验
 # ------------------------------------------------------------------------------
 CONFIRM=""
 if [ -t 0 ]; then
@@ -312,41 +306,28 @@ chattr +i /etc/resolv.conf 2>/dev/null || true
 # 步骤 D：IPv4 & IPv6 双栈端口跳跃
 echo -e "${CYAN}[4/6] 配置 IPv4/IPv6 双栈端口跳跃 (20000:50000 -> 2053)...${PLAIN}"
 # IPv4
-iptables -t nat -C PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports 2053 2>/dev/null || \
+iptables -t nat -C PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports 2053 >/dev/null 2>&1 || \
     iptables -t nat -I PREROUTING 1 -p udp --dport 20000:50000 -j REDIRECT --to-ports 2053
-iptables -C INPUT -p udp --dport 2053 -j ACCEPT 2>/dev/null || \
+iptables -C INPUT -p udp --dport 2053 -j ACCEPT >/dev/null 2>&1 || \
     iptables -I INPUT 1 -p udp --dport 2053 -j ACCEPT
-iptables -C INPUT -p udp --dport 20000:50000 -j ACCEPT 2>/dev/null || \
+iptables -C INPUT -p udp --dport 20000:50000 -j ACCEPT >/dev/null 2>&1 || \
     iptables -I INPUT 1 -p udp --dport 20000:50000 -j ACCEPT
 
 # IPv6
-ip6tables -t nat -C PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports 2053 2>/dev/null || \
+ip6tables -t nat -C PREROUTING -p udp --dport 20000:50000 -j REDIRECT --to-ports 2053 >/dev/null 2>&1 || \
     ip6tables -t nat -I PREROUTING 1 -p udp --dport 20000:50000 -j REDIRECT --to-ports 2053
-ip6tables -C INPUT -p udp --dport 2053 -j ACCEPT 2>/dev/null || \
+ip6tables -C INPUT -p udp --dport 2053 -j ACCEPT >/dev/null 2>&1 || \
     ip6tables -I INPUT 1 -p udp --dport 2053 -j ACCEPT
-ip6tables -C INPUT -p udp --dport 20000:50000 -j ACCEPT 2>/dev/null || \
+ip6tables -C INPUT -p udp --dport 20000:50000 -j ACCEPT >/dev/null 2>&1 || \
     ip6tables -I INPUT 1 -p udp --dport 20000:50000 -j ACCEPT
 
 netfilter-persistent save >/dev/null 2>&1 || true
 
-# 步骤 E：SSH 加固与 Fail2ban
-echo -e "${CYAN}[5/6] 配置 SSH 安全防护与 Fail2ban 自动封禁...${PLAIN}"
+# 步骤 E：SSH 加固与 Fail2ban (仅限重试限制与防爆破，不关密码登录)
+echo -e "${CYAN}[5/6] 配置 SSH 重试限制与 Fail2ban 自动封禁...${PLAIN}"
 sed -i -E 's/^#?MaxAuthTries .*/MaxAuthTries 3/' /etc/ssh/sshd_config
 if ! grep -q "^MaxAuthTries" /etc/ssh/sshd_config; then
     echo "MaxAuthTries 3" >> /etc/ssh/sshd_config
-fi
-
-# 检查公钥安全
-if [ -f ~/.ssh/authorized_keys ] && grep -qE "ssh-rsa|ssh-ed25519" ~/.ssh/authorized_keys; then
-    sed -i -E 's/^#?(PasswordAuthentication).*/\1 no/' /etc/ssh/sshd_config
-    sed -i -E 's/^#?(KbdInteractiveAuthentication).*/\1 no/' /etc/ssh/sshd_config 2>/dev/null || true
-    sed -i -E 's/^#?(PubkeyAuthentication).*/\1 yes/' /etc/ssh/sshd_config
-    if [ -d /etc/ssh/sshd_config.d ]; then
-        find /etc/ssh/sshd_config.d/ -type f -name "*.conf" -exec sed -i -E 's/^#?(PasswordAuthentication).*/\1 no/' {} + 2>/dev/null || true
-    fi
-    echo -e "  [✔] 检测到 SSH 公钥，已彻底停用密码认证"
-else
-    echo -e "  ${YELLOW}[!] 未检测到 SSH 公钥，保留密码认证以防失联${PLAIN}"
 fi
 
 if sshd -t 2>/dev/null; then
